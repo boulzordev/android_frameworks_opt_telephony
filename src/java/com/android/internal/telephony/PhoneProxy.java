@@ -824,6 +824,11 @@ public class PhoneProxy extends Handler implements Phone {
     }
 
     @Override
+    public void addParticipant(String dialString, Message onComplete) throws CallStateException {
+        mActivePhone.addParticipant(dialString, onComplete);
+    }
+
+    @Override
     public boolean handlePinMmi(String dialString) {
         return mActivePhone.handlePinMmi(dialString);
     }
@@ -1670,6 +1675,22 @@ public class PhoneProxy extends Handler implements Phone {
 
     public boolean isWifiCallingEnabled() {
         return mActivePhone.isWifiCallingEnabled();
+    }
+
+    @Override
+    public void getCallForwardingOption(int commandInterfaceCFReason,
+            int commandInterfaceServiceClass, Message onComplete) {
+        mActivePhone.getCallForwardingOption(commandInterfaceCFReason,
+                commandInterfaceServiceClass, onComplete);
+    }
+
+    @Override
+    public void setCallForwardingOption(int commandInterfaceCFReason,
+            int commandInterfaceCFAction, String dialingNumber,
+            int commandInterfaceServiceClass, int timerSeconds, Message onComplete) {
+        mActivePhone.setCallForwardingOption(commandInterfaceCFReason,
+                commandInterfaceCFAction, dialingNumber,
+                commandInterfaceServiceClass, timerSeconds, onComplete);
     }
 
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
