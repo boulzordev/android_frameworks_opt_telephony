@@ -31,6 +31,7 @@ ifneq ($(BOARD_RIL_CLASS),)
 LOCAL_SRC_FILES += $(call find-other-java-files,$(BOARD_RIL_CLASS))
 endif
 
+LOCAL_STATIC_JAVA_LIBRARIES := ims-ext-common
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := telephony-common
 
