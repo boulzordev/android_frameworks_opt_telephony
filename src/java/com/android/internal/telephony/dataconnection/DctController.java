@@ -36,6 +36,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.SubscriptionManager.OnSubscriptionsChangedListener;
 import android.text.TextUtils;
 import android.util.LocalLog;
+import android.util.Pair;
 import android.util.SparseArray;
 
 import com.android.internal.telephony.Phone;
@@ -71,6 +72,7 @@ public class DctController extends Handler {
     private static final int EVENT_SETTINGS_CHANGED = 106;
     private static final int EVENT_SUBSCRIPTIONS_CHANGED = 107;
 
+    private static final int EVENT_DATA_RAT_CHANGED = 400;
     private static final int EVENT_DATA_ATTACHED = 500;
     private static final int EVENT_DATA_DETACHED = 600;
     private static final int EVENT_EMERGENCY_CALL_TOGGLED = 700;
@@ -136,6 +138,7 @@ public class DctController extends Handler {
 
     private void updatePhoneBaseForIndex(int index, PhoneBase phoneBase) {
         logd("updatePhoneBaseForIndex for phone index=" + index);
+        boolean isNetworkFilterReset = false;
 
         phoneBase.getServiceStateTracker().registerForDataConnectionAttached(mRspHandler,
                    EVENT_DATA_ATTACHED + index, null);
@@ -143,6 +146,8 @@ public class DctController extends Handler {
                    EVENT_DATA_DETACHED + index, null);
         phoneBase.registerForEmergencyCallToggle(mRspHandler,
                 EVENT_EMERGENCY_CALL_TOGGLED + index, null);
+        phoneBase.getServiceStateTracker().registerForDataRegStateOrRatChanged(mRspHandler,
+                EVENT_DATA_RAT_CHANGED + index, null);
 
         ConnectivityManager cm = (ConnectivityManager)mPhones[index].getContext()
             .getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -153,6 +158,7 @@ public class DctController extends Handler {
             mNetworkFactoryMessenger[index] = null;
             mNetworkFactory[index] = null;
             mNetworkFilter[index] = null;
+            isNetworkFilterReset = true;
         }
 
         // TODO - just make this a singleton.  It'll be simpler
@@ -170,6 +176,13 @@ public class DctController extends Handler {
         mNetworkFilter[index].addCapability(NetworkCapabilities.NET_CAPABILITY_EIMS);
         mNetworkFilter[index].addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED);
         mNetworkFilter[index].addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+
+        if (isNetworkFilterReset) {
+            int subId = mPhones[index].getSubId();
+            mNetworkFilter[index].setNetworkSpecifier(String.valueOf(subId));
+            logd("Network specifier set with subid: " + subId);
+            isNetworkFilterReset = false;
+        }
 
         mNetworkFactory[index] = new TelephonyNetworkFactory(this.getLooper(),
                 mPhones[index].getContext(), "TelephonyNetworkFactory", phoneBase,
@@ -198,7 +211,16 @@ public class DctController extends Handler {
                 logd("EVENT_PHONE" + (msg.what - EVENT_DATA_ATTACHED + 1)
                         + "_DATA_ATTACH.");
                 mDcSwitchAsyncChannel[msg.what - EVENT_DATA_ATTACHED].notifyDataAttached();
+            } else if (msg.what >= EVENT_DATA_RAT_CHANGED) {
+                logd("EVENT_PHONE" + (msg.what - EVENT_DATA_RAT_CHANGED + 1)
+                        + "_DATA_RAT_CHANGED.");
+                AsyncResult ar = (AsyncResult)msg.obj;
+                Pair<Integer, Integer> drsRatPair = (Pair<Integer, Integer>)ar.result;
+                int rilRat = drsRatPair.second;
+                mDcSwitchAsyncChannel[msg.what - EVENT_DATA_RAT_CHANGED].
+                        notifyDataRatChange(rilRat);
             }
+
         }
     };
 
@@ -537,9 +559,9 @@ public class DctController extends Handler {
 
         int activePhoneId = -1;
         for (int i=0; i<mDcSwitchStateMachine.length; i++) {
+            mDcSwitchAsyncChannel[i].notifyDdsSwitch();
             if (!mDcSwitchAsyncChannel[i].isIdleSync()) {
                 activePhoneId = i;
-                break;
             }
         }
 
